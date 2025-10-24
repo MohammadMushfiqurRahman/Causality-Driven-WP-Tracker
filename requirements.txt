@@ -1,0 +1,10 @@
+pandas
+requests
+numpy
+scikit-learn
+tensorflow # or pytorch, depending on model choice
+fastapi
+uvicorn
+python-multipart
+shap # or lime
+streamlit # or dash/plotly

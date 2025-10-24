@@ -1,0 +1,133 @@
+Product Requirements Document (PRD)
+
+Project Name: Causality-Driven Win Probability (WP) Tracker
+
+Version: 1.0
+Date: October 24, 2025
+Target Audience: Football Analysts, Scouting Department, Media Partners
+
+1. Executive Summary
+
+The Causality-Driven WP Tracker is a high-frequency machine learning system designed to provide real-time, explainable prediction of match outcomes. The core innovation is moving beyond simple correlation to quantify the causal impact (Leverage Score) of every on-field event (pass, tackle, shot) on a team’s Win Probability.
+
+The primary objective is to transform raw event data into actionable tactical insights by accurately identifying and explaining the game’s true inflection points.
+
+2. Goals (Success Metrics)
+
+Success will be measured against the following quantifiable metrics:
+
+Metric
+
+Target
+
+Rationale
+
+Model Calibration (Brier Score)
+
+$< 0.10$
+
+Ensures the predicted probabilities are trustworthy and align with observed outcomes.
+
+Inference Latency
+
+$< 500 \text{ milliseconds}$
+
+Critical for achieving the "Real-Time" requirement and supporting live applications.
+
+Prediction Accuracy (Log-Loss)
+
+Beat standard $xG$-based models by $> 5\%$
+
+Demonstrates the superior predictive power of the sequential model.
+
+Feature Explainability
+
+SHAP values implemented and utilized for $100\%$ of predictions.
+
+Ensures the "Causality-Driven" promise is met by providing clear justification for WP shifts.
+
+3. Target User & Use Cases
+
+Primary Persona: Football Analyst (Internal)
+
+User Story
+
+Requirements Supported
+
+As an analyst, I need to quantify the true value of a specific player’s actions so I can accurately assess transfer targets based on their contribution to Win Probability.
+
+F.R. 2.1, 2.3 (Leverage Score, Player-Action Breakdown)
+
+As an analyst, I need to review the game’s critical moments in a post-match analysis to understand why the match swung, leading to focused tactical review sessions.
+
+F.R. 2.2 (Moment of Maximum Leverage)
+
+As an analyst, I need the model to be robust and transparent so I can trust the probabilities when presenting findings to coaching staff.
+
+T.R. 3.1, 3.2 (Calibration, SHAP Integration)
+
+4. Functional Requirements (F.R.)
+
+2.1. Real-Time Win Probability Display
+
+The system must:
+
+Display a continuous, updating graph showing the Win, Draw, and Loss probabilities over the full 90 minutes.
+
+Clearly annotate the graph with key events (Goals, Red Cards, Penalties).
+
+Use a dynamic visualization framework (Streamlit/Dash/Plotly) to maintain low latency on the front end.
+
+2.2. Moment of Maximum Leverage Detection
+
+The system must:
+
+Calculate a Leverage Score for every event, defined as the absolute change in Win Probability: $|\text{WP}_t - \text{WP}_{t-1}|$.
+
+Automatically identify and list the Top 5 most impactful events of the match (e.g., "Tackle at 78:30" caused a $+15\%$ WP shift).
+
+Provide a drill-down view for these moments, showing the model's feature inputs and SHAP interpretation.
+
+2.3. Event Causality Breakdown
+
+The system must:
+
+Provide an Event Log showing all processed events chronologically.
+
+For each event, display the model’s prediction confidence and the top 3 features (inputs) that contributed most to the resulting probability shift (via SHAP/LIME).
+
+Allow filtering of the Event Log by player, action type (Pass, Shot, Tackle), and minimum Leverage Score.
+
+5. Technical & Machine Learning Requirements (T.R.)
+
+3.1. Modeling Architecture
+
+Sequential Modeling: The core model MUST be based on a recurrent architecture (e.g., LSTM or GRU) to effectively model the sequence of events and game flow.
+
+Feature Engineering: MANDATORY inclusion of advanced features, specifically a model-derived metric for Pitch Control (or a close proxy derived from StatsBomb freeze frames).
+
+Data Source: Must leverage high-granularity event data (e.g., StatsBomb Open Data).
+
+3.2. MLOps and Deployment
+
+Containerization: The inference model must be packaged into a deployable Docker container.
+
+Real-Time Inference API: Must expose a low-latency API endpoint (using FastAPI) to receive JSON-formatted events and return predictions.
+
+Simulation: A dedicated script must simulate real-time event ingestion to test and validate the sub-500ms latency requirement.
+
+3.3. Explainability (XAI)
+
+SHAP Integration: The prediction pipeline MUST integrate a SHAP or LIME explainer to generate feature importance values for every prediction, which powers the Causality Breakdown (F.R. 2.3).
+
+6. Out of Scope
+
+The following features are explicitly excluded from the scope of this version:
+
+Full-scale integration with cloud streaming services (e.g., AWS Kinesis/Kafka, beyond simulation).
+
+Generation of raw tracking data from video footage (Computer Vision).
+
+Pre-match probability prediction (focus is purely on in-game state).
+
+Injury or fatigue modeling.
