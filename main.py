@@ -14,27 +14,33 @@ def main():
     engineered_features_dir = "data/engineered_features"
     models_dir = "models"
 
-    # 1. Download StatsBomb data
-    print("Starting data download...")
-    download_statsbomb_data(competition_id, season_id, raw_events_dir)
-    print("Data download complete.")
+    # 1. Download StatsBomb data (only if raw_events_dir is empty)
+    if not os.path.exists(raw_events_dir) or not os.listdir(raw_events_dir):
+        print("Starting data download...")
+        download_statsbomb_data(competition_id, season_id, raw_events_dir)
+        print("Data download complete.")
+    else:
+        print("Raw event data already exists. Skipping download.")
 
-    # 2. Preprocess downloaded data
-    print("Starting data preprocessing...")
-    if not os.path.exists(processed_events_dir):
-        os.makedirs(processed_events_dir)
+    # 2. Preprocess downloaded data (only if processed_events_dir is empty)
+    if not os.path.exists(processed_events_dir) or not os.listdir(processed_events_dir):
+        print("Starting data preprocessing...")
+        if not os.path.exists(processed_events_dir):
+            os.makedirs(processed_events_dir)
 
-    for filename in os.listdir(raw_events_dir):
-        if filename.startswith("events_") and filename.endswith(".json"):
-            file_path = os.path.join(raw_events_dir, filename)
-            print(f"Processing {filename}...")
-            df = load_and_preprocess_events(file_path)
-            
-            # Save processed data (e.g., to CSV or Parquet)
-            output_path = os.path.join(processed_events_dir, filename.replace(".json", ".csv"))
-            df.to_csv(output_path, index=False)
-            print(f"Saved processed data to {output_path}")
-    print("Data preprocessing complete.")
+        for filename in os.listdir(raw_events_dir):
+            if filename.startswith("events_") and filename.endswith(".json"):
+                file_path = os.path.join(raw_events_dir, filename)
+                print(f"Processing {filename}...")
+                df = load_and_preprocess_events(file_path)
+                
+                # Save processed data (e.g., to CSV or Parquet)
+                output_path = os.path.join(processed_events_dir, filename.replace(".json", ".csv"))
+                df.to_csv(output_path, index=False)
+                print(f"Saved processed data to {output_path}")
+        print("Data preprocessing complete.")
+    else:
+        print("Processed event data already exists. Skipping preprocessing.")
 
     # 3. Run Feature Engineering
     print("Starting feature engineering...")
