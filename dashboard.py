@@ -25,7 +25,7 @@ def get_available_matches():
         return []
     return [f for f in os.listdir(PROCESSED_EVENTS_DIR) if f.endswith('.csv')]
 
-def run_simulation(match_file, chart_placeholder, info_placeholder, leverage_placeholder):
+def run_simulation(match_file, chart_placeholder, info_placeholder, leverage_placeholder, event_log_placeholder):
     """Simulates a real-time event stream and updates the dashboard."""
     st.info(f"Starting simulation for: {match_file}")
 
@@ -57,7 +57,7 @@ def run_simulation(match_file, chart_placeholder, info_placeholder, leverage_pla
     )
 
     event_buffer = []
-    leverage_events = []
+    event_log = []
     last_win_prob = None
     last_draw_prob = None
     last_loss_prob = None
@@ -106,20 +106,25 @@ def run_simulation(match_file, chart_placeholder, info_placeholder, leverage_pla
                     f"Win: {win_prob:.2f} | Draw: {draw_prob:.2f} | Loss: {loss_prob:.2f}"
                 )
 
-                # --- Moment of Maximum Leverage Calculation (F.R. 2.2) ---
+                # --- Leverage & Event Log Calculation (F.R. 2.2 & 2.3) ---
+                leverage_score = 0
+                wp_change = 0
                 if last_win_prob is not None:
                     # Leverage is the absolute change in Win Probability
                     leverage_score = abs(win_prob - last_win_prob)
                     wp_change = win_prob - last_win_prob
 
-                    leverage_events.append({
-                        'timestamp': event_data.get('timestamp_seconds'),
-                        'event_type': event_data.get('type_name', 'Unknown Event'),
-                        'player': event_data.get('player_name', 'N/A'),
-                        'leverage_score': leverage_score,
-                        'wp_change': wp_change,
-                        'explanation': explanation
-                    })
+                event_log.append({
+                    'timestamp': event_data.get('timestamp_seconds'),
+                    'event_type': event_data.get('type_name', 'Unknown Event'),
+                    'player': event_data.get('player_name', 'N/A'),
+                    'win_prob': win_prob,
+                    'draw_prob': draw_prob,
+                    'loss_prob': loss_prob,
+                    'leverage_score': leverage_score,
+                    'wp_change': wp_change,
+                    'explanation': explanation
+                })
 
                 # Update the last known probabilities
                 last_win_prob = win_prob
@@ -135,11 +140,11 @@ def run_simulation(match_file, chart_placeholder, info_placeholder, leverage_pla
 
     st.success("Simulation complete.")
 
-    # --- Display Top 5 Leverage Moments ---
-    if leverage_events:
+    # --- Display Top 5 Leverage Moments (F.R. 2.2) ---
+    if event_log:
         leverage_placeholder.header("Top 5 Moments of Maximum Leverage")
         # Sort events by leverage score, descending
-        top_leverage_events = sorted(leverage_events, key=lambda x: x['leverage_score'], reverse=True)[:5]
+        top_leverage_events = sorted(event_log, key=lambda x: x['leverage_score'], reverse=True)[:5]
 
         for i, event in enumerate(top_leverage_events):
             wp_change_str = f"+{event['wp_change']:.1%}" if event['wp_change'] > 0 else f"{event['wp_change']:.1%}"
@@ -151,6 +156,47 @@ def run_simulation(match_file, chart_placeholder, info_placeholder, leverage_pla
                 st.write("**Causal Explanation (Top Features):**")
                 for feature_info in event['explanation']:
                     st.markdown(f"- **{feature_info['feature']}**: `SHAP Value: {feature_info['shap_value']:.4f}`")
+
+    # --- Display Event Causality Breakdown (F.R. 2.3) ---
+    if event_log:
+        event_log_placeholder.header("Event Causality Breakdown")
+        log_df = pd.DataFrame(event_log)
+
+        # --- Filtering UI ---
+        col1, col2, col3 = event_log_placeholder.columns(3)
+
+        # Player Filter
+        unique_players = sorted(log_df['player'].dropna().unique())
+        selected_players = col1.multiselect("Filter by Player:", unique_players)
+
+        # Event Type Filter
+        unique_event_types = sorted(log_df['event_type'].dropna().unique())
+        selected_event_types = col2.multiselect("Filter by Event Type:", unique_event_types)
+
+        # Leverage Score Filter
+        min_leverage = col3.slider(
+            "Minimum Leverage Score:",
+            min_value=0.0,
+            max_value=log_df['leverage_score'].max() if not log_df.empty else 1.0,
+            value=0.0,
+            step=0.01
+        )
+
+        # --- Apply Filters ---
+        filtered_df = log_df.copy()
+        if selected_players:
+            filtered_df = filtered_df[filtered_df['player'].isin(selected_players)]
+        if selected_event_types:
+            filtered_df = filtered_df[filtered_df['event_type'].isin(selected_event_types)]
+        if min_leverage > 0.0:
+            filtered_df = filtered_df[filtered_df['leverage_score'] >= min_leverage]
+
+        # --- Display Filtered Log ---
+        display_cols = ['timestamp', 'event_type', 'player', 'win_prob', 'draw_prob', 'loss_prob', 'leverage_score']
+        event_log_placeholder.dataframe(
+            filtered_df[display_cols].style.format({'timestamp': '{:.2f}', 'win_prob': '{:.3f}', 'draw_prob': '{:.3f}', 'loss_prob': '{:.3f}', 'leverage_score': '{:.4f}'}),
+            use_container_width=True
+        )
 
 # --- Main UI ---
 st.sidebar.header("Match Simulation")
@@ -165,7 +211,8 @@ else:
         # Placeholders for the chart and info text
         chart_placeholder = st.empty()
         info_placeholder = st.empty()
-        leverage_placeholder = st.container() # Use a container for the leverage section
-        run_simulation(selected_match, chart_placeholder, info_placeholder, leverage_placeholder)
+        leverage_placeholder = st.container()
+        event_log_placeholder = st.container()
+        run_simulation(selected_match, chart_placeholder, info_placeholder, leverage_placeholder, event_log_placeholder)
     else:
         st.info("Select a match and click 'Start Simulation' to begin.")
