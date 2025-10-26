@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import requests
 import time
 import os
@@ -24,7 +25,7 @@ def get_available_matches():
         return []
     return [f for f in os.listdir(PROCESSED_EVENTS_DIR) if f.endswith('.csv')]
 
-def run_simulation(match_file, chart_placeholder, info_placeholder):
+def run_simulation(match_file, chart_placeholder, info_placeholder, leverage_placeholder):
     """Simulates a real-time event stream and updates the dashboard."""
     st.info(f"Starting simulation for: {match_file}")
 
@@ -56,6 +57,10 @@ def run_simulation(match_file, chart_placeholder, info_placeholder):
     )
 
     event_buffer = []
+    leverage_events = []
+    last_win_prob = None
+    last_draw_prob = None
+    last_loss_prob = None
     for index, event in events_df.iterrows():
         event_data = event.to_dict()
         event_buffer.append(event_data)
@@ -75,6 +80,7 @@ def run_simulation(match_file, chart_placeholder, info_placeholder):
                 win_prob = prediction.get('win_probability', 0)
                 draw_prob = prediction.get('draw_probability', 0)
                 loss_prob = prediction.get('loss_probability', 0)
+                explanation = prediction.get('explanation', [])
 
                 # Update plot data
                 new_row = pd.DataFrame([{
@@ -100,6 +106,27 @@ def run_simulation(match_file, chart_placeholder, info_placeholder):
                     f"Win: {win_prob:.2f} | Draw: {draw_prob:.2f} | Loss: {loss_prob:.2f}"
                 )
 
+                # --- Moment of Maximum Leverage Calculation (F.R. 2.2) ---
+                if last_win_prob is not None:
+                    # Leverage is the absolute change in Win Probability
+                    leverage_score = abs(win_prob - last_win_prob)
+                    wp_change = win_prob - last_win_prob
+
+                    leverage_events.append({
+                        'timestamp': event_data.get('timestamp_seconds'),
+                        'event_type': event_data.get('type_name', 'Unknown Event'),
+                        'player': event_data.get('player_name', 'N/A'),
+                        'leverage_score': leverage_score,
+                        'wp_change': wp_change,
+                        'explanation': explanation
+                    })
+
+                # Update the last known probabilities
+                last_win_prob = win_prob
+                last_draw_prob = draw_prob
+                last_loss_prob = loss_prob
+
+
             except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
                 st.error(f"API Error at event {index+1}: {e}")
                 break
@@ -107,6 +134,23 @@ def run_simulation(match_file, chart_placeholder, info_placeholder):
         time.sleep(0.05)  # Simulate delay
 
     st.success("Simulation complete.")
+
+    # --- Display Top 5 Leverage Moments ---
+    if leverage_events:
+        leverage_placeholder.header("Top 5 Moments of Maximum Leverage")
+        # Sort events by leverage score, descending
+        top_leverage_events = sorted(leverage_events, key=lambda x: x['leverage_score'], reverse=True)[:5]
+
+        for i, event in enumerate(top_leverage_events):
+            wp_change_str = f"+{event['wp_change']:.1%}" if event['wp_change'] > 0 else f"{event['wp_change']:.1%}"
+            expander_title = (
+                f"**{i+1}. {event['event_type']} by {event['player']} at {event['timestamp']:.2f}s** "
+                f"(WP Change: {wp_change_str})"
+            )
+            with leverage_placeholder.expander(expander_title):
+                st.write("**Causal Explanation (Top Features):**")
+                for feature_info in event['explanation']:
+                    st.markdown(f"- **{feature_info['feature']}**: `SHAP Value: {feature_info['shap_value']:.4f}`")
 
 # --- Main UI ---
 st.sidebar.header("Match Simulation")
@@ -121,6 +165,7 @@ else:
         # Placeholders for the chart and info text
         chart_placeholder = st.empty()
         info_placeholder = st.empty()
-        run_simulation(selected_match, chart_placeholder, info_placeholder)
+        leverage_placeholder = st.container() # Use a container for the leverage section
+        run_simulation(selected_match, chart_placeholder, info_placeholder, leverage_placeholder)
     else:
         st.info("Select a match and click 'Start Simulation' to begin.")
