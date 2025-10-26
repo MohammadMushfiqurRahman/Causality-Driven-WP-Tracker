@@ -133,9 +133,12 @@ async def predict_win_probability(request: PredictionRequest):
     )
 
     return {
-        "win_probability": probabilities,
-        "draw_probability": probabilities,
-        "loss_probability": probabilities,
+        # The model returns probabilities in a list of lists, e.g., [[win, draw, loss]].
+        # We extract the first (and only) list of probabilities.
+        # Assuming the model's output order is [Win, Draw, Loss]
+        "win_probability": probabilities[0][0],
+        "draw_probability": probabilities[0][1],
+        "loss_probability": probabilities[0][2],
         "explanation": explanation['explanation']
     }
 

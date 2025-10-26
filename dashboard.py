@@ -71,9 +71,10 @@ def run_simulation(match_file, chart_placeholder, info_placeholder):
                 response.raise_for_status()
                 prediction = response.json()
 
-                # The API currently returns the same probability for win, draw, and loss.
-                # Assuming the output is [win, draw, loss]
-                win_prob, draw_prob, loss_prob = prediction['win_probability'][0]
+                # The API now returns individual probabilities.
+                win_prob = prediction.get('win_probability', 0)
+                draw_prob = prediction.get('draw_probability', 0)
+                loss_prob = prediction.get('loss_probability', 0)
 
                 # Update plot data
                 new_row = pd.DataFrame([{
