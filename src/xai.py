@@ -3,35 +3,22 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-def get_shap_values(model, preprocessor, data_instance, feature_names):
+def get_shap_values(model, background_data, data_instance):
     """
-    Generates SHAP values for a given model prediction.
+    Generates SHAP values for a given model prediction using a representative background dataset.
     
     Args:
         model: The trained Keras model.
-        preprocessor: The StandardScaler used for feature scaling.
+        background_data: A representative sample of the training data (numpy array) to be used as the background for the SHAP explainer.
+                         Shape should be (num_samples, sequence_length, num_features).
         data_instance: A single preprocessed event sequence (numpy array) for which to explain the prediction.
                        Shape should be (1, sequence_length, num_features).
-        feature_names: List of feature names corresponding to the input data.
                        
     Returns:
         shap_values: SHAP values for each feature.
         expected_value: The expected value of the model's output.
     """
-    # SHAP requires a background dataset for explanation.
-    # For a single instance, we can use a small subset of training data as background.
-    # In a real scenario, you'd use a representative sample of your training data.
-    
-    # For demonstration, let's create a dummy background.
-    # In a real application, you would pass a representative background dataset.
-    # For example, if `data_instance` is (1, 10, 3), then `background_data` could be (N, 10, 3).
-    
-    # Create a dummy background dataset for the explainer
-    # This should ideally be a subset of your training data
-    background_data = np.zeros((10, data_instance.shape, data_instance.shape)) 
-
-    # Create a SHAP explainer
-    # Using DeepExplainer for Keras models
+    # Create a SHAP explainer using the provided background data
     explainer = shap.DeepExplainer(model, background_data)
     
     # Calculate SHAP values
