@@ -34,38 +34,31 @@ class EventData(BaseModel):
 class PredictionRequest(BaseModel):
     events: List[EventData]
 
+import joblib
+
 @app.on_event("startup")
 async def load_resources():
     """
-    Load the trained model and scaler when the FastAPI application starts up.
+    Load the trained model, scaler, and background data when the FastAPI application starts up.
     """
-    global model_instance, scaler, feature_names
+    global model_instance, scaler, feature_names, background_data
 
     models_dir = "models"
     model_path = os.path.join(models_dir, "win_probability_model.h5")
-    scaler_path = os.path.join(models_dir, "scaler.pkl") # Assuming scaler is saved as pkl
+    scaler_path = os.path.join(models_dir, "scaler.pkl")
+    background_data_path = os.path.join(models_dir, "background_data.npy")
 
-    if not os.path.exists(model_path):
-        raise RuntimeError(f"Model file not found at {model_path}. Please train the model first.")
+    if not all(os.path.exists(p) for p in [model_path, scaler_path, background_data_path]):
+        raise RuntimeError("One or more required model files (model, scaler, background data) not found.")
     
-    # Load the model
+    # Load the model, scaler, and background data
     model_instance = WinProbabilityModel.load_model(model_path)
+    scaler = joblib.load(scaler_path)
+    background_data = np.load(background_data_path)
     
-    # For the scaler and feature_names, we need to re-run a small part of prepare_data_for_model
-    # or save them explicitly during training. For now, we'll re-create a dummy scaler and features.
-    # In a production system, you would save and load the actual scaler and feature_names.
-    
-    # Dummy data to get feature names and a dummy scaler
-    # This part needs to be improved to load the actual scaler and feature names
-    # from the training pipeline.
-    
-    # For now, let's assume the features are fixed as defined in src/model.py
+    # Assuming feature names are saved or can be inferred
+    # In a robust implementation, feature names should be saved with the model/scaler.
     feature_names = ['x', 'y', 'timestamp_seconds', 'pitch_control_score', 'time_since_last_event', 'distance_to_goal']
-    
-    # Create a dummy scaler for now. In a real scenario, load the saved scaler.
-    scaler = StandardScaler()
-    # You would fit this scaler on a representative dataset if not loading a saved one.
-    # For this example, we'll assume it's ready to transform.
 
     print("Model and resources loaded successfully.")
 

@@ -32,13 +32,13 @@ def get_shap_values(model, background_data, data_instance):
     
     return shap_values, expected_value
 
-def explain_prediction(model, preprocessor, event_sequence, feature_names, top_n=3):
+def explain_prediction(model, background_data, event_sequence, feature_names, top_n=3):
     """
-    Explains a single model prediction using SHAP, returning top contributing features.
+    Explains a single model prediction using SHAP, returning top contributing features for the last event.
     
     Args:
         model: The trained Keras model.
-        preprocessor: The StandardScaler used for feature scaling.
+        background_data: A representative sample of the training data for the SHAP explainer.
         event_sequence: A single preprocessed event sequence (numpy array) for which to explain the prediction.
                         Shape should be (sequence_length, num_features).
         feature_names: List of feature names.
@@ -53,34 +53,35 @@ def explain_prediction(model, preprocessor, event_sequence, feature_names, top_n
     input_data = np.expand_dims(event_sequence, axis=0)
     
     # Get model prediction
-    prediction = model.predict(input_data) # Get probabilities for the single instance
+    prediction = model.predict(input_data)
     
     # Get SHAP values
-    shap_values_per_class, expected_value_per_class = get_shap_values(model, preprocessor, input_data, feature_names)
+    shap_values_per_class, _ = get_shap_values(model, background_data, input_data)
     
-    # For simplicity, let's focus on explaining the predicted class (highest probability)
+    # Explain the predicted class (highest probability)
     predicted_class_index = np.argmax(prediction)
-    shap_values_for_predicted_class = shap_values_per_class[predicted_class_index]
+    shap_values_for_predicted_class = shap_values_per_class[predicted_class_index][0]
     
-    # Average SHAP values across the sequence length for each feature
-    # This gives an overall importance for each feature across the sequence
-    avg_shap_values = np.mean(np.abs(shap_values_for_predicted_class), axis=0)
+    # Get SHAP values and feature values for the LAST event in the sequence
+    last_event_shap_values = shap_values_for_predicted_class[-1, :]
+    last_event_feature_values = event_sequence[-1, :]
     
     # Create a DataFrame for easier sorting and selection
     feature_importance = pd.DataFrame({
         'feature': feature_names,
-        'shap_value': avg_shap_values
+        'shap_value': last_event_shap_values,
+        'feature_value': last_event_feature_values
     })
     
     # Sort by absolute SHAP value to get top features
-    feature_importance = feature_importance.sort_values(by='shap_value', ascending=False)
+    feature_importance['abs_shap_value'] = feature_importance['shap_value'].abs()
+    feature_importance = feature_importance.sort_values(by='abs_shap_value', ascending=False)
     
     explanation = []
     for _, row in feature_importance.head(top_n).iterrows():
-        # To get the actual feature value, we need to inverse transform or get from original data
-        # For now, we'll just show the feature name and its SHAP contribution
         explanation.append({
             'feature': row['feature'],
+            'value': row['feature_value'],
             'shap_value': row['shap_value']
         })
             
@@ -91,9 +92,9 @@ def explain_prediction(model, preprocessor, event_sequence, feature_names, top_n
 
 if __name__ == "__main__":
     # Dummy example for demonstration
-    # In a real scenario, you would load your trained model, scaler, and real data.
+    # In a real scenario, you would load your trained model, a representative background dataset, and real data.
     
-    # 1. Create a dummy model (similar to src/model.py)
+    # 1. Create a dummy model
     input_shape = (10, 3) # sequence_length, num_features
     dummy_model = tf.keras.Sequential([
         tf.keras.layers.Input(shape=input_shape),
@@ -104,25 +105,24 @@ if __name__ == "__main__":
     ])
     dummy_model.compile(optimizer='adam', loss='categorical_crossentropy')
 
-    # 2. Create a dummy preprocessor (StandardScaler)
-    from sklearn.preprocessing import StandardScaler
-    dummy_scaler = StandardScaler()
+    # 2. Create a dummy background dataset (e.g., 100 samples)
+    dummy_background_data = np.random.rand(100, 10, 3)
     
-    # 3. Create dummy event sequence data
-    dummy_event_sequence = np.random.rand(10, 3) # 10 events, 3 features
+    # 3. Create a dummy event sequence
+    dummy_event_sequence = np.random.rand(10, 3)
     dummy_feature_names = ['x_coordinate', 'y_coordinate', 'time_since_last_event']
     
     # 4. Explain a prediction
     explanation_result = explain_prediction(
         model=dummy_model,
-        preprocessor=dummy_scaler,
+        background_data=dummy_background_data,
         event_sequence=dummy_event_sequence,
         feature_names=dummy_feature_names,
-        top_n=2
+        top_n=3
     )
     
     print("Explanation Result:")
     print(f"Prediction Probabilities: {explanation_result['prediction']}")
-    print("Top Features Contributing to Prediction:")
+    print("Top Features Contributing to Prediction for the Last Event:")
     for item in explanation_result['explanation']:
-        print(f"  - Feature: {item['feature']}, SHAP Value: {item['shap_value']:.4f}")
+        print(f"  - Feature: {item['feature']}, Value: {item['value']:.4f}, SHAP Value: {item['shap_value']:.4f}")
