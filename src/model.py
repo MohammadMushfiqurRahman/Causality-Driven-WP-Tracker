@@ -87,7 +87,7 @@ def prepare_data_for_model(processed_events_dir="data/processed_events", sequenc
     # --- Simplified Feature Engineering ---
     # For demonstration, let's use 'x' and 'y' coordinates and 'timestamp_seconds' as features.
     # In a real scenario, you'd have many more engineered features.
-    features = ['x', 'y', 'timestamp_seconds', 'pitch_control_score', 'time_since_last_event', 'distance_to_goal']
+    features = ['timestamp_seconds', 'pitch_control_score', 'time_since_last_event', 'distance_to_goal']
     
     # Filter for events that have these features
     feature_df = full_df.dropna(subset=features)
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     X_train, X_val, y_train, y_val, scaler = prepare_data_for_model(sequence_length=sequence_length)
 
     if X_train is not None:
-        input_shape = (X_train.shape, X_train.shape) # (sequence_length, num_features)
+        input_shape = (X_train.shape[1], X_train.shape[2]) # (sequence_length, num_features)
         model_instance = WinProbabilityModel(input_shape=input_shape)
         model_instance.model.summary()
 
