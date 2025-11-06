@@ -56,7 +56,7 @@ def main():
     )
 
     if X_train is not None:
-        input_shape = (X_train.shape, X_train.shape) # (sequence_length, num_features)
+        input_shape = (X_train.shape[1], X_train.shape[2]) # (sequence_length, num_features)
         model_instance = WinProbabilityModel(input_shape=input_shape)
         model_instance.model.summary()
 
@@ -75,8 +75,8 @@ def main():
         
         explanation_result = explain_prediction(
             model=model_instance.model,
-            preprocessor=scaler, # Use the scaler fitted during data preparation
-            event_sequence=sample_event_sequence,
+            background_data=X_train, # Use training data as background for SHAP
+            event_sequence=X_val[0],   # Explain the first sequence in the validation set
             feature_names=feature_names,
             top_n=3
         )
